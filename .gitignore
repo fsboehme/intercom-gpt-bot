@@ -1,0 +1,7 @@
+.env
+articles.db
+.chroma/
+.vscode/
+env/
+__pycache__/
+sample_data.py
