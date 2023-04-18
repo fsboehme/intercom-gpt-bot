@@ -1,6 +1,8 @@
+import argparse
 import ast
 from contextlib import contextmanager
 from typing import Any, Dict, List
+from bs4 import BeautifulSoup
 
 from sqlalchemy import (
     Column,
@@ -122,7 +124,62 @@ def generate_checksum(section):
     return hashlib.md5(section.encode("utf-8")).hexdigest()
 
 
-def store_sections(sections: List[str], article_id: int):
+def clean_sections(sections):
+    """
+    Remove empty paragraphs and whitespace from sections
+    """
+    cleaned_sections = []
+    for section in sections:
+        cleaned_sections.append(clean_html(section))
+    return cleaned_sections
+
+
+def clean_html(html):
+    soup = BeautifulSoup(html, "html.parser")
+
+    # Remove class and id attributes
+    for tag in soup():
+        if "class" in tag.attrs:
+            del tag.attrs["class"]
+        if "id" in tag.attrs:
+            del tag.attrs["id"]
+
+    # Remove empty paragraphs
+    for p in soup.find_all("p"):
+        if not p.get_text(strip=True):
+            p.decompose()
+
+    # Minify: remove all whitespace
+    minified_html = "".join(line.strip() for line in str(soup).split("\n"))
+
+    return minified_html
+
+
+def get_annotation(article: dict):
+    title = article["title"]
+    description = article["description"]
+    url = article["url"]
+    annotation = "<p><em>Excerpt from "
+    if description:
+        annotation += f'<a href="{url}" target="_blank">{title} - {description}</a>'
+    else:
+        annotation += f'<a href="{url}" target="_blank">{title}</a>'
+    annotation += "</em></p>"
+
+    return annotation
+
+
+def annotate_sections(sections, article: dict):
+    annotation = get_annotation(article)
+    annotated_sections = []
+    for section in sections:
+        annotated_sections.append(annotation + section)
+    return annotated_sections
+
+
+def store_sections(sections: List[str], article: dict):
+    sections = annotate_sections(clean_sections(sections), article)
+    article_id = article["id"]
     # Use the context manager to handle the session
     with session_scope() as db_session:
         # Get existing sections for the article
@@ -194,7 +251,7 @@ def store_sections(sections: List[str], article_id: int):
         collection.add(embeddings=embeddings, metadatas=metadatas, ids=ids)
 
 
-def main():
+def main(force_update):
     from api_intercom import get_all_articles
 
     articles = get_all_articles()
@@ -203,13 +260,21 @@ def main():
     updated_articles = store_articles(articles)
     print(f"Updated articles: {len(updated_articles)}")
 
-    # for article in articles:
-    for article in updated_articles:
+    loop_articles = updated_articles if not force_update else articles
+
+    for article in loop_articles:
         print(f'Article: {article["title"]}')
         sections = make_sections(article)
         print(f"Sections: {len(sections)}")
-        store_sections(sections, article["id"])
+        store_sections(sections, article)
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Update stored articles.")
+    parser.add_argument(
+        "--force_update",
+        action="store_true",
+        help="process sections from all articles, modified or not",
+    )
+    args = parser.parse_args()
+    main(args.force_update)

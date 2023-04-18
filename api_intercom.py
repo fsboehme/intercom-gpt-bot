@@ -15,7 +15,7 @@ headers = {
 }
 
 
-def list_articles(url="https://api.intercom.io/articles"):
+def api_request(url="https://api.intercom.io/articles"):
     response = requests.get(url, headers=headers)
     json_response = json.loads(response.text)
     return json_response
@@ -26,7 +26,12 @@ def get_all_articles():
     articles = []
     url = "https://api.intercom.io/articles"
     while url:
-        json_response = list_articles(url)
+        json_response = api_request(url)
         articles += json_response["data"]
         url = json_response["pages"].get("next", None)
     return articles
+
+
+def get_conversation(conversation_id):
+    url = f"https://api.intercom.io/conversations/{conversation_id}"
+    return api_request(url)
