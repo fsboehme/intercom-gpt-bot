@@ -4,11 +4,10 @@ import hmac
 import os
 import time
 from quart import Quart, request, jsonify
-import requests
 from dotenv import load_dotenv
 from api_intercom import get_conversation
 
-from reply import answer
+from reply import get_answer
 
 load_dotenv()
 
@@ -18,7 +17,7 @@ app = Quart(__name__)
 
 @app.route("/")
 async def hello_world():
-    asyncio.create_task(process_webhook("hello world"))
+    app.add_background_task(process_webhook, "hello world")
     return "Hello World!"
 
 
@@ -30,17 +29,22 @@ async def intercom_webhook():
 
     # Process the webhook data asynchronously
     webhook_data = await request.json
-    asyncio.create_task(process_webhook(webhook_data))
-
-    return jsonify(success=True, message="Webhook processed successfully"), 200
+    answer = app.add_background_task(process_webhook, webhook_data)
+    print("Webhook processing asynchronously")
+    return "OK"
 
 
 async def process_webhook(webhook_data):
     # Add your async logic to process the webhook data here
     # e.g., store it in a database, trigger other actions, or make API calls
     print(f"Received webhook: {webhook_data}")
+    if webhook_data == "hello world":
+        print("hello")
+        await asyncio.sleep(5)
+        print("world")
+        return
     item = webhook_data["data"]["item"]
-    print(f"Data > Item: {item}")
+    # print(f"Data > Item: {item}")
     if not item["type"] == "conversation":
         return
 
@@ -53,7 +57,7 @@ async def process_webhook(webhook_data):
     messages = [f"{user_name}: {msg}"]
     if item["conversation_parts"]["total_count"] > 0:
         # make API request to fetch full conversation
-        conversation = get_conversation(conversation_id)
+        conversation = await get_conversation(conversation_id)
         # add conversation_parts to messages
         convo_parts = conversation["conversation_parts"]["conversation_parts"]
         if len(convo_parts) > 10:
@@ -69,7 +73,8 @@ async def process_webhook(webhook_data):
             msg = part["body"]
             # messages.append({"role": "user", "content": f"{author_name}: {msg}"})
             messages.append(f"{author_name}: {msg}")
-    answer("\n".join(messages))
+    answer = await get_answer("\n".join(messages))
+    return answer
 
 
 async def validate_intercom_request(request):

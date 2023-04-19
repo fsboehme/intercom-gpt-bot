@@ -173,7 +173,7 @@ def annotate_sections(sections, article: dict):
     annotation = get_annotation(article)
     annotated_sections = []
     for section in sections:
-        annotated_sections.append(annotation + section)
+        annotated_sections.append(section + annotation)
     return annotated_sections
 
 
@@ -238,8 +238,10 @@ def store_sections(sections: List[str], article: dict):
         # Delete sections that no longer exist
         for existing_section in existing_sections:
             if existing_section.checksum not in matched_existing_sections:
+                # add for removal from chroma if it exists there
+                if collection.get(existing_section.checksum):
+                    removed_sections.append(existing_section.checksum)
                 # Delete from the database
-                removed_sections.append(existing_section.checksum)
                 db_session.delete(existing_section)
 
         # Delete removed sections from chroma
@@ -260,10 +262,16 @@ def main(force_update):
     updated_articles = store_articles(articles)
     print(f"Updated articles: {len(updated_articles)}")
 
-    loop_articles = updated_articles if not force_update else articles
+    loop_articles = updated_articles
+    if force_update:
+        loop_articles = [
+            article
+            for article in articles
+            if article["body"] and article["state"] == "published"
+        ]
 
     for article in loop_articles:
-        print(f'Article: {article["title"]}')
+        print(f'Article: {article["title"]} - {article["url"]}')
         sections = make_sections(article)
         print(f"Sections: {len(sections)}")
         store_sections(sections, article)

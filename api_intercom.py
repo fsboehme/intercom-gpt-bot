@@ -15,23 +15,23 @@ headers = {
 }
 
 
-def api_request(url="https://api.intercom.io/articles"):
+async def api_request(url="https://api.intercom.io/articles"):
     response = requests.get(url, headers=headers)
     json_response = json.loads(response.text)
     return json_response
 
 
 # walk through the pages
-def get_all_articles():
+async def get_all_articles():
     articles = []
     url = "https://api.intercom.io/articles"
     while url:
-        json_response = api_request(url)
+        json_response = await api_request(url)
         articles += json_response["data"]
         url = json_response["pages"].get("next", None)
     return articles
 
 
-def get_conversation(conversation_id):
+async def get_conversation(conversation_id):
     url = f"https://api.intercom.io/conversations/{conversation_id}"
-    return api_request(url)
+    return await api_request(url)

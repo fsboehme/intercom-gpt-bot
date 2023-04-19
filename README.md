@@ -18,11 +18,27 @@ Generate embeddings from your articles (fetches all your articles from the Inter
 
     python make_embeddings.py
 
-That's all you can do right now.
+### Run locally
 
-## Next:
+In a terminal window run
 
-- add response functionality
-- add webhook receiver for new messages
+    python intercom_webhook.py
+
+In another terminal window run
+
+    ngrok http 127.0.0.1:5000
+
+Set up your webhook in Intercom developer hub > webhooks.
+
+- Paste the ngrok forwarding URL + /webhook for the _Endpoint URL_.
+- Under _Topics_, subscribe to
+  - conversation.user.created
+  - conversation.user.replied
+
+## To do:
+
+- some more testing
+- send response back to intercom
+- deploy
 - add webhook receiver for new/updated articles
 - switch Chroma to using client/server mode

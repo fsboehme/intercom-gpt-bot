@@ -62,6 +62,7 @@ soupsieve==2.4.1
 SQLAlchemy==2.0.9
 starlette==0.26.1
 sympy==1.11.1
+termcolor==2.2.0
 threadpoolctl==3.1.0
 tokenizers==0.13.3
 toml==0.10.2
