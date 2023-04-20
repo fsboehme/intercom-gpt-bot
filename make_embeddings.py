@@ -1,5 +1,6 @@
 import argparse
 import ast
+import asyncio
 from contextlib import contextmanager
 from typing import Any, Dict, List
 from bs4 import BeautifulSoup
@@ -253,10 +254,10 @@ def store_sections(sections: List[str], article: dict):
         collection.add(embeddings=embeddings, metadatas=metadatas, ids=ids)
 
 
-def main(force_update):
+async def main(force_update):
     from api_intercom import get_all_articles
 
-    articles = get_all_articles()
+    articles = await get_all_articles()
     # from sample_data import articles
 
     updated_articles = store_articles(articles)
@@ -285,4 +286,6 @@ if __name__ == "__main__":
         help="process sections from all articles, modified or not",
     )
     args = parser.parse_args()
-    main(args.force_update)
+
+    # run the main coroutine with asyncio.run()
+    asyncio.run(main(args.force_update))

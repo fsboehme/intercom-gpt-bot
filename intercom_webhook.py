@@ -2,10 +2,9 @@ import asyncio
 import hashlib
 import hmac
 import os
-import time
 from quart import Quart, request, jsonify
 from dotenv import load_dotenv
-from api_intercom import get_conversation
+from api_intercom import get_conversation, send_reply
 
 from reply import get_answer
 
@@ -34,6 +33,14 @@ async def intercom_webhook():
     return "OK"
 
 
+author_labels = {
+    "user": "User",
+    "contact": "Visitor",
+    "admin": "Rep",
+    "bot": "Bot",
+}
+
+
 async def process_webhook(webhook_data):
     # Add your async logic to process the webhook data here
     # e.g., store it in a database, trigger other actions, or make API calls
@@ -51,7 +58,7 @@ async def process_webhook(webhook_data):
     conversation_id = item["id"]
 
     # user_name = item["conversation_message"]["author"].get("name", "User")
-    user_name = item["conversation_message"]["author"].get("type", "User")
+    user_name = author_labels.get(item["conversation_message"]["author"]["type"])
     msg = item["conversation_message"]["body"]
     # messages = [{"role": "user", "content": f"{author_name}: {msg}"}]
     messages = [f"{user_name}: {msg}"]
@@ -60,21 +67,29 @@ async def process_webhook(webhook_data):
         conversation = await get_conversation(conversation_id)
         # add conversation_parts to messages
         convo_parts = conversation["conversation_parts"]["conversation_parts"]
-        if len(convo_parts) > 10:
+        if len(convo_parts) > 8:
             messages.append("...[messages truncated]...")
-        for part in convo_parts[-10:]:
+        for part in convo_parts[-8:]:
             # skip if body is empty
             if not part["body"]:
                 continue
 
             # todo: add logic to handle 'assistant' replies from GPT
             # author_name = part["author"].get("name", user_name)
-            author_name = part["author"]["type"]
+            author_name = author_labels.get(part["author"]["type"])
             msg = part["body"]
             # messages.append({"role": "user", "content": f"{author_name}: {msg}"})
             messages.append(f"{author_name}: {msg}")
-    answer = await get_answer("\n".join(messages))
-    return answer
+
+    response_message = await get_answer("\n".join(messages))
+    if response_message == "PASS":
+        pass
+    if response_message == "CLOSE":
+        # for now just post as a note, after some more testing we can actually close the conversation
+        await send_reply(conversation_id, response_message, "note")
+    else:
+        await send_reply(conversation_id, response_message)
+    return response_message
 
 
 async def validate_intercom_request(request):

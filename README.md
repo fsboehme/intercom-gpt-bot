@@ -8,7 +8,7 @@ Intercom API + Open AI API + Chroma.
 
 ## Setup
 
-Copy `.env.sample` to `.env` and enter your API Keys.
+Copy `.env.sample` to `.env` and enter your API Keys, company name, account_id for the intercom account from which you want to send replies (recommend setting up a new one that looks like a bot so people know what they're dealing with).
 
 Install requirements:
 
@@ -17,6 +17,8 @@ Install requirements:
 Generate embeddings from your articles (fetches all your articles from the Intercom API and runs them through Open AI the Embeddings API):
 
     python make_embeddings.py
+
+Simply run this again after making changes to articles and it will update any changes.
 
 ### Run locally
 
@@ -37,8 +39,6 @@ Set up your webhook in Intercom developer hub > webhooks.
 
 ## To do:
 
-- some more testing
-- send response back to intercom
-- deploy
+- more testing and prompt optimization
 - add webhook receiver for new/updated articles
 - switch Chroma to using client/server mode
