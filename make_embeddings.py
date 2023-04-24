@@ -2,6 +2,8 @@ import argparse
 import ast
 import asyncio
 from contextlib import contextmanager
+import hashlib
+import re
 from typing import Any, Dict, List
 from bs4 import BeautifulSoup
 
@@ -33,6 +35,16 @@ class Article(Base):
     body = Column(String)
     url = Column(String)
     updated_at = Column(Integer)
+
+
+class Section(Base):
+    __tablename__ = "sections"
+
+    id = Column(Integer, primary_key=True)
+    article_id = Column(Integer, ForeignKey("articles.id"))
+    checksum = Column(String)
+    content = Column(Text)
+    embedding = Column(Text)
 
 
 @contextmanager
@@ -94,35 +106,33 @@ def make_sections(article):
     sections = []
     partial_section = ""
     # split by headers
-    for section in re.split(r"(<h[1-3])", article["body"]):
-        # if section is not empty, add it to the list
-        if section:
-            # if we have a partial section, merge it with the current section
-            if partial_section:
-                section = partial_section + section
-                partial_section = ""
-            # if section is separator, store to merge with next section
-            elif section.startswith("<h"):
-                partial_section = section
-                continue
-            sections.append(section)
+    for section in re.split(r"(<h[1-3][^>]*>.*?</h[1-3]>)", article["body"]):
+        # if section is not empty and not just whitespace
+        if section and not section.isspace():
+            # if section starts with a header
+            if section.startswith("<h"):
+                # if we have a partial section, merge it with the current section
+                if partial_section:
+                    partial_section += section
+                # if we don't have a partial section, save it for later
+                else:
+                    partial_section = section
+            # if section doesn't start with a header
+            else:
+                # if we have a partial section, merge it with the current section
+                if partial_section:
+                    section = partial_section + section
+                    partial_section = ""
+
+                # remove <hr> tags at the beginning or end of a section
+                section = re.sub(r"^<hr>", "", section)
+                section = re.sub(r"<hr>$", "", section)
+
+                sections.append(section)
+    # Add any remaining partial_section to the last section
+    if partial_section and sections:
+        sections[-1] += partial_section
     return sections
-
-
-class Section(Base):
-    __tablename__ = "sections"
-
-    id = Column(Integer, primary_key=True)
-    article_id = Column(Integer, ForeignKey("articles.id"))
-    checksum = Column(String)
-    content = Column(Text)
-    embedding = Column(Text)
-
-
-def generate_checksum(section):
-    import hashlib
-
-    return hashlib.md5(section.encode("utf-8")).hexdigest()
 
 
 def clean_sections(sections):
@@ -131,7 +141,9 @@ def clean_sections(sections):
     """
     cleaned_sections = []
     for section in sections:
-        cleaned_sections.append(clean_html(section))
+        cs = clean_html(section)
+        if cs:
+            cleaned_sections.append(cs)
     return cleaned_sections
 
 
@@ -176,6 +188,10 @@ def annotate_sections(sections, article: dict):
     for section in sections:
         annotated_sections.append(section + annotation)
     return annotated_sections
+
+
+def generate_checksum(section):
+    return hashlib.md5(section.encode("utf-8")).hexdigest()
 
 
 def store_sections(sections: List[str], article: dict):
@@ -254,7 +270,7 @@ def store_sections(sections: List[str], article: dict):
         collection.add(embeddings=embeddings, metadatas=metadatas, ids=ids)
 
 
-async def main(force_update):
+async def make_embeddings(force_update=False):
     from api_intercom import get_all_articles
 
     articles = await get_all_articles()
@@ -288,4 +304,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # run the main coroutine with asyncio.run()
-    asyncio.run(main(args.force_update))
+    asyncio.run(make_embeddings(args.force_update))

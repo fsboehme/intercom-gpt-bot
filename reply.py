@@ -6,7 +6,7 @@ from chroma import collection
 from make_embeddings import Article, Section, session_scope
 import argparse
 
-from gptrim import trim
+# from gptrim import trim
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -23,10 +23,10 @@ async def get_answer(customer_chat):
             .filter(Section.checksum.in_(search_results["ids"][0]))
             .all()
         )
-        context_sections = "\n---\n".join([section.content for section in sections])
+        context_sections = "\n-\n".join([section.content for section in sections])
 
     # construct the prompt
-    system_prompt = f"You are a friendly {COMPANY} customer service chat representative. Given the following sections from {COMPANY} help articles, add a helpful and concise message to the chat below using only the given help article sections. Strongly prefer answering with whole article sections directly as provided. Always format your response as HTML and include links to the relevant articles. If you are unsure and the answer is not explicitly written in the articles provided simply reply 'PASS'. Don't repeat yourself - if the question has been answered and no further info is requested, just say 'CLOSE'. If the user just said hi or stated that they have a question, please prompt them to state their question."
+    system_prompt = f"You are a friendly {COMPANY} representative. Use the info in the following sections from {COMPANY} help articles to respond to the chat below. Include links to articles you used in your answer. If you are unsure and the answer is not explicitly written in the articles reply 'PASS'. Avoid repeating what has already been said. If question has been answered and no further info requested, say 'CLOSE'. If user only said hi or stated they have a question, prompt them to state their question. Give an easily readable answer in HTML."
     # *Always* show your source by linking to the relevant article.
 
     # could use gptrim here to save tokens
@@ -37,9 +37,9 @@ async def get_answer(customer_chat):
 
     prompt = (
         system_prompt
-        + "\n---\nHelp article sections:\n"
+        + "\nHelp article sections:\n"
         + context_sections
-        + "\n---\nCustomer chat:\n"
+        + "\n--\nChat:\n"
         + customer_chat
         + "\nRep:"
     )

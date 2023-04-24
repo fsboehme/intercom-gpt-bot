@@ -47,10 +47,10 @@ async def send_reply(conversation_id, message, message_type="comment"):
         "message_type": message_type if not TEST_MODE else "note",
         "body": message,
     }
-    cprint(f"Sending reply: {data}", "yellow")
+    # cprint(f"Sending reply: {data}", "yellow")
     response = requests.post(
         url, headers=headers, json=data
     )  # returns the conversation
-    cprint(f"Response: {response.text}", "magenta")
+    # cprint(f"Response: {response.text}", "magenta")
     json_response = json.loads(response.text)
     return json_response
