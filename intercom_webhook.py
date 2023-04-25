@@ -17,7 +17,7 @@ load_dotenv()
 REPLY_ADMIN_NAME = os.getenv("REPLY_ADMIN_NAME")
 AUTHOR_LABELS = {
     "user": "User",
-    "contact": "Visitor",
+    "lead": "Visitor",
     "admin": "Rep",
     "bot": "Bot",
 }
@@ -70,7 +70,7 @@ async def process_webhook(webhook_data):
         # for now just post as a note, after some more testing we can actually close the conversation
         await send_reply(conversation_id, response_message, "note")
     else:
-        cprint(response_message + EXPERIMENTAL_NOTICE, "red")
+        # cprint(response_message + EXPERIMENTAL_NOTICE, "red")
         await send_reply(conversation_id, response_message + EXPERIMENTAL_NOTICE)
     return response_message
 
@@ -78,9 +78,9 @@ async def process_webhook(webhook_data):
 async def prep_conversation(item):
     conversation_id = item["id"]
 
-    # user_name = item["conversation_message"]["author"].get("name", "User")
-    user_name = AUTHOR_LABELS.get(item["conversation_message"]["author"]["type"])
-    msg = item["conversation_message"]["body"]
+    # user_name = item["source"]["author"].get("name", "User")
+    user_name = AUTHOR_LABELS.get(item["source"]["author"]["type"])
+    msg = item["source"]["body"]
     # messages = [{"role": "user", "content": f"{author_name}: {msg}"}]
     messages = [f"{user_name}: {msg}"]
     if item["conversation_parts"]["total_count"] > 0:
