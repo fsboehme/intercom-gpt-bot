@@ -1,17 +1,16 @@
 import asyncio
-import os
 from termcolor import cprint
-from api_openai import get_chat_completion
-from chroma import collection
-from make_embeddings import Article, Section, session_scope
+from api.openai import get_chat_completion
+from api.chroma import collection
+from make_embeddings import Section, session_scope
 import argparse
+
+from prompt import system_prompt
 
 # from gptrim import trim
 from dotenv import load_dotenv
 
 load_dotenv()
-
-COMPANY = os.getenv("COMPANY")
 
 
 async def get_answer(customer_chat):
@@ -26,14 +25,15 @@ async def get_answer(customer_chat):
         context_sections = "\n-\n".join([section.content for section in sections])
 
     # construct the prompt
-    system_prompt = f"You are a friendly {COMPANY} representative. Use the info in the following sections from {COMPANY} help articles to respond to the chat below. Include links to articles you used in your answer. If you are unsure and the answer is not explicitly written in the articles reply 'PASS'. Avoid repeating what has already been said. If question has been answered and no further info requested, say 'CLOSE'. If user only said hi or stated they have a question, prompt them to state their question. Give an easily readable answer in HTML."
+    # Avoid repeating what has already been said.
     # *Always* show your source by linking to the relevant article.
 
     # could use gptrim here to save tokens
     # system_prompt = trim(system_prompt)
 
-    if len(context_sections) > 8000:
-        context_sections = context_sections[:8000] + "..."
+    if len(customer_chat) + len(context_sections) > 10000:
+        truncate_at = 10000 - len(customer_chat)
+        context_sections = context_sections[:truncate_at] + "..."
 
     prompt = (
         system_prompt

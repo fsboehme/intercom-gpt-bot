@@ -3,10 +3,16 @@ import asyncio
 import hashlib
 import hmac
 import os
+from bs4 import BeautifulSoup
 from quart import Quart, request, jsonify
 from dotenv import load_dotenv
 from termcolor import cprint
-from api_intercom import get_conversation, send_reply
+from api.intercom import (
+    close_conversation,
+    get_conversation,
+    send_reply,
+    unassign_conversation,
+)
 from make_embeddings import make_embeddings
 
 from reply import get_answer
@@ -14,6 +20,7 @@ from reply import get_answer
 load_dotenv()
 
 
+REPLY_ADMIN_ID = os.getenv("REPLY_ADMIN_ID")
 REPLY_ADMIN_NAME = os.getenv("REPLY_ADMIN_NAME")
 AUTHOR_LABELS = {
     "user": "User",
@@ -21,7 +28,10 @@ AUTHOR_LABELS = {
     "admin": "Rep",
     "bot": "Bot",
 }
-EXPERIMENTAL_NOTICE = f"\n<div><hr><small><em>NOTE: {REPLY_ADMIN_NAME} is our experimental AI chatbot. It may not always provide a correct answer.</em></small></div>"
+EXPERIMENTAL_NOTICE_INNER = f"NOTE: {REPLY_ADMIN_NAME} is our experimental AI chatbot. It may not always provide a correct answer."
+EXPERIMENTAL_NOTICE = (
+    f"\n<div><hr><small><em>{EXPERIMENTAL_NOTICE_INNER}</em></small></div>"
+)
 
 
 app = Quart(__name__)
@@ -42,7 +52,6 @@ async def intercom_webhook():
     # Process the webhook data asynchronously
     webhook_data = await request.json
     answer = app.add_background_task(process_webhook, webhook_data)
-    print("Webhook processing asynchronously")
     return "OK"
 
 
@@ -50,39 +59,58 @@ async def process_webhook(webhook_data):
     # Add your async logic to process the webhook data here
     # e.g., store it in a database, trigger other actions, or make API calls
     print(f"Received webhook: {webhook_data}")
-    if webhook_data == "hello world":
-        print("hello")
-        await asyncio.sleep(5)
-        print("world")
-        return
+
     item = webhook_data["data"]["item"]
     # print(f"Data > Item: {item}")
     if not item["type"] == "conversation":
+        return
+    if item["admin_assignee_id"] and item["admin_assignee_id"] != REPLY_ADMIN_ID:
         return
 
     conversation_id, messages = await prep_conversation(item)
 
     response_message = await get_answer("\n".join(messages))
 
-    if response_message == "PASS":
-        pass
-    elif response_message == "CLOSE":
-        # for now just post as a note, after some more testing we can actually close the conversation
-        await send_reply(conversation_id, response_message, "note")
+    if "PASS" in response_message:
+        # strip out PASS and send the rest of the message
+        response_message = response_message.replace("PASS", "").strip()
+        if response_message:
+            await send_reply(conversation_id, response_message + EXPERIMENTAL_NOTICE)
+        await unassign_conversation(conversation_id)
+    elif "CLOSE" in response_message:
+        # strip out CLOSE and send the rest of the message
+        response_message = response_message.replace("CLOSE", "").strip()
+        if response_message:
+            await send_reply(conversation_id, response_message + EXPERIMENTAL_NOTICE)
+        await send_reply(conversation_id, "CLOSE CONVERSATION")
+        # await close_conversation(conversation_id)
     else:
         # cprint(response_message + EXPERIMENTAL_NOTICE, "red")
         await send_reply(conversation_id, response_message + EXPERIMENTAL_NOTICE)
     return response_message
 
 
+def clean_html(html):
+    soup = BeautifulSoup(html, "html.parser")
+    # remove empty tags
+    for tag in soup.find_all():
+        if not tag.contents:
+            tag.extract()
+
+    # trim whitespace from start and end of the string
+    return soup.get_text().strip()
+
+
 async def prep_conversation(item):
     conversation_id = item["id"]
-
-    # user_name = item["source"]["author"].get("name", "User")
     user_name = AUTHOR_LABELS.get(item["source"]["author"]["type"])
-    msg = item["source"]["body"]
-    # messages = [{"role": "user", "content": f"{author_name}: {msg}"}]
-    messages = [f"{user_name}: {msg}"]
+    # skip first message if automated
+    if item["source"]["delivered_as"] == "automated":
+        messages = []
+    else:
+        msg = item["source"]["body"]
+        messages = [f"{user_name}: {msg}"]
+
     if item["conversation_parts"]["total_count"] > 0:
         # make API request to fetch full conversation
         conversation = await get_conversation(conversation_id)
@@ -95,14 +123,17 @@ async def prep_conversation(item):
             messages.append("...[messages truncated]...")
 
         for part in convo_parts[-8:]:
+            # skip bot messages
+            if part["author"]["type"] == "bot":
+                continue
             # strip EXPERIMENTAL_NOTICE
-            part["body"] = part["body"].replace(EXPERIMENTAL_NOTICE, "")
+            msg = part["body"].replace(EXPERIMENTAL_NOTICE, "")
+            # strip EXPERIMENTAL_NOTICE_INNER (intercom sometimes modifies the HTML)
+            msg = msg.replace(EXPERIMENTAL_NOTICE_INNER, "")
+            msg = clean_html(msg)
 
-            # author_name = part["author"].get("name", user_name)
-            author_name = AUTHOR_LABELS.get(part["author"]["type"])
-            msg = part["body"]
-            # messages.append({"role": "user", "content": f"{author_name}: {msg}"})
-            messages.append(f"{author_name}: {msg}")
+            author_label = AUTHOR_LABELS.get(part["author"]["type"])
+            messages.append(f"{author_label}: {msg}")
 
     return conversation_id, messages
 

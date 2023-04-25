@@ -1,4 +1,5 @@
-from make_embeddings import *
+from api.chroma import collection
+from make_embeddings import Article, Section, collection, session_scope
 
 
 def clean_chroma_sections():
@@ -16,3 +17,7 @@ def clean_chroma_sections():
         if removed_sections:
             collection.delete(ids=removed_sections)
             print(f"Removed sections: {removed_sections}")
+
+
+if __name__ == "__main__":
+    clean_chroma_sections()

@@ -8,7 +8,7 @@ load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 OPENAI_EMBEDDINGS_MODEL = os.getenv("OPENAI_EMBEDDINGS_MODEL", "text-embedding-ada-002")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
-OPENAI_TEMPERATURE = os.getenv("OPENAI_TEMPERATURE", 0.25)
+OPENAI_TEMPERATURE = float(os.getenv("OPENAI_TEMPERATURE", 0.25))
 
 
 def get_embedding(text, model=OPENAI_EMBEDDINGS_MODEL):

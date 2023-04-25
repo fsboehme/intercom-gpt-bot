@@ -41,16 +41,44 @@ async def get_conversation(conversation_id):
 
 async def send_reply(conversation_id, message, message_type="comment"):
     url = f"https://api.intercom.io/conversations/{conversation_id}/reply"
-    data = {
+    payload = {
         "type": "admin",
         "admin_id": str(REPLY_ADMIN_ID),
         "message_type": message_type if not TEST_MODE else "note",
         "body": message,
     }
-    # cprint(f"Sending reply: {data}", "yellow")
     response = requests.post(
-        url, headers=headers, json=data
+        url, headers=headers, json=payload
     )  # returns the conversation
-    # cprint(f"Response: {response.text}", "magenta")
     json_response = json.loads(response.text)
     return json_response
+
+
+async def manage_conversation(conversation_id, payload):
+    url = f"https://api.intercom.io/conversations/{conversation_id}/parts"
+    response = requests.post(url, headers=headers, json=payload)
+    json_response = json.loads(response.text)
+    return json_response
+
+
+async def unassign_conversation(conversation_id):
+    payload = {
+        "message_type": "assignment",
+        "admin_id": REPLY_ADMIN_ID,
+        "assignee_id": "0",
+    }
+    return await manage_conversation(conversation_id, payload)
+
+
+async def assign_conversation(conversation_id, assignee_id=REPLY_ADMIN_ID):
+    payload = {
+        "message_type": "assignment",
+        "admin_id": REPLY_ADMIN_ID,
+        "assignee_id": assignee_id,
+    }
+    return await manage_conversation(conversation_id, payload)
+
+
+async def close_conversation(conversation_id):
+    payload = {"message_type": "close", "admin_id": REPLY_ADMIN_ID}
+    return await manage_conversation(conversation_id, payload)

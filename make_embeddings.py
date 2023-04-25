@@ -3,7 +3,6 @@ import ast
 import asyncio
 from contextlib import contextmanager
 import hashlib
-import re
 from typing import Any, Dict, List
 from bs4 import BeautifulSoup
 
@@ -17,8 +16,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-from chroma import collection
-from api_openai import get_embedding
+from api.chroma import collection
+from api.openai import get_embedding
 
 Base = declarative_base()
 
@@ -271,7 +270,7 @@ def store_sections(sections: List[str], article: dict):
 
 
 async def make_embeddings(force_update=False):
-    from api_intercom import get_all_articles
+    from api.intercom import get_all_articles
 
     articles = await get_all_articles()
     # from sample_data import articles
