@@ -32,6 +32,7 @@ EXPERIMENTAL_NOTICE_INNER = f"NOTE: {REPLY_ADMIN_NAME} is our experimental AI ch
 EXPERIMENTAL_NOTICE = (
     f"\n<div><hr><small><em>{EXPERIMENTAL_NOTICE_INNER}</em></small></div>"
 )
+TEST_MODE = os.getenv("TEST_MODE", "false").lower() == "true"
 
 
 app = Quart(__name__)
@@ -64,8 +65,15 @@ async def process_webhook(webhook_data):
     # print(f"Data > Item: {item}")
     if not item["type"] == "conversation":
         return
+    # only reply to conversations that are unassigned or assigned to the bot
     if item["admin_assignee_id"] and item["admin_assignee_id"] != REPLY_ADMIN_ID:
-        return
+        if TEST_MODE:
+            # in test mode, we want to process all conversations
+            cprint(
+                f"Conversation already assigned to {item['admin_assignee_id']}", "red"
+            )
+        else:
+            return
 
     conversation_id, messages = await prep_conversation(item)
 
