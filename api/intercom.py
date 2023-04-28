@@ -40,6 +40,7 @@ async def get_conversation(conversation_id):
 
 
 async def send_reply(conversation_id, message, message_type="comment"):
+    cprint(message, "green")
     url = f"https://api.intercom.io/conversations/{conversation_id}/reply"
     payload = {
         "type": "admin",
