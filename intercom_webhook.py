@@ -79,7 +79,7 @@ async def process_webhook(webhook_data):
 
     response_message = await get_answer("\n".join(chat_history))
 
-    result = await send_response(item["id"], response_message)
+    result = await send_response(item, response_message)
     return result
 
 
