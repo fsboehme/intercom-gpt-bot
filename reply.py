@@ -1,6 +1,6 @@
 import asyncio
 from termcolor import cprint
-from api.openai import get_chat_completion
+from api.openai import OPENAI_MODEL, get_chat_completion
 from api.chroma import collection
 from make_embeddings import Section, session_scope
 import argparse
@@ -21,15 +21,17 @@ async def get_answer(customer_chat):
     # take the question and search the most relevant embeddings
     context_sections = get_context_sections(question)
 
-    # construct the prompt
-
     # could use gptrim here to save tokens
     # system_prompt = trim(system_prompt)
 
     # could up this limit if using gpt-4
+    if OPENAI_MODEL == "gpt-4":
+        max_chat_length = 20000
+    else:
+        max_chat_length = 10000
     # could also use tiktoken to count tokens instead of characters
-    if len(customer_chat) + len(context_sections) > 10000:
-        truncate_at = 10000 - len(customer_chat)
+    if len(customer_chat) + len(context_sections) > max_chat_length:
+        truncate_at = max_chat_length - len(customer_chat)
         context_sections = context_sections[:truncate_at] + "..."
 
     prompt = (

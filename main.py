@@ -34,6 +34,7 @@ DIVIDER = "<p>_____</p>"
 EXPERIMENTAL_NOTICE = f"{DIVIDER}<p><i>{EXPERIMENTAL_NOTICE_INNER}</i></p>"
 TEST_MODE = os.getenv("TEST_MODE", "false").lower() == "true"
 GITHUB_WEBHOOK_SECRET = os.getenv("GITHUB_WEBHOOK_SECRET")
+UPDATE_ARTICLES_SECRET = os.getenv("UPDATE_ARTICLES_SECRET")
 
 
 app = Quart(__name__)
@@ -42,7 +43,12 @@ app = Quart(__name__)
 @app.route("/")
 async def hello_world():
     app.add_background_task(process_webhook, "hello world")
-    return "Hello World!"
+    # if update articles secret in GET request is correct, update embeddings
+    if request.args.get("update_articles") == UPDATE_ARTICLES_SECRET:
+        await make_embeddings()
+        clean_chroma_sections()
+        return "Articles updated!"
+    return "Beep boop! We're live!"
 
 
 @app.route("/webhook", methods=["POST"])
@@ -58,8 +64,6 @@ async def intercom_webhook():
 
 
 async def process_webhook(webhook_data):
-    # Add your async logic to process the webhook data here
-    # e.g., store it in a database, trigger other actions, or make API calls
     print(f"Received webhook: {webhook_data}")
     if webhook_data == "hello world":
         return
