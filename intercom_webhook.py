@@ -1,9 +1,8 @@
-import argparse
 import asyncio
 import hashlib
 import hmac
 import os
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, NavigableString
 from quart import Quart, request, jsonify
 from dotenv import load_dotenv
 from termcolor import cprint
@@ -13,6 +12,7 @@ from api.intercom import (
     send_reply,
     unassign_conversation,
 )
+from clean_chroma_sections import clean_chroma_sections
 from make_embeddings import make_embeddings
 
 from reply import get_answer
@@ -24,14 +24,13 @@ REPLY_ADMIN_ID = int(os.getenv("REPLY_ADMIN_ID"))
 REPLY_ADMIN_NAME = os.getenv("REPLY_ADMIN_NAME")
 AUTHOR_LABELS = {
     "user": "User",
-    "lead": "Visitor",
+    "lead": "User",
     "admin": "Rep",
     "bot": "Bot",
 }
-EXPERIMENTAL_NOTICE_INNER = f"NOTE: {REPLY_ADMIN_NAME} is our experimental AI chatbot. It may not always provide a correct answer."
-EXPERIMENTAL_NOTICE = (
-    f"\n<hr><p><small><em>{EXPERIMENTAL_NOTICE_INNER}</em></small></p>"
-)
+EXPERIMENTAL_NOTICE_INNER = f"NOTE: {REPLY_ADMIN_NAME} is our experimental AI chatbot. It may not always provide a correct answer. A human will follow up if needed."
+DIVIDER = "<p>_____</p>"
+EXPERIMENTAL_NOTICE = f"{DIVIDER}<p><i>{EXPERIMENTAL_NOTICE_INNER}</i></p>"
 TEST_MODE = os.getenv("TEST_MODE", "false").lower() == "true"
 
 
@@ -90,14 +89,16 @@ async def send_response(conversation, response_message):
         response_message = response_message.replace("PASS", "").strip()
         response_message = clean_html(response_message)
         if response_message:
-            await send_reply(conversation_id, response_message + EXPERIMENTAL_NOTICE)
+            result = await send_reply(
+                conversation_id, response_message + EXPERIMENTAL_NOTICE
+            )
         # if assigned to REPLY_ADMIN_ID
         elif conversation["admin_assignee_id"] == REPLY_ADMIN_ID:
-            await send_reply(
+            result = await send_reply(
                 conversation_id,
                 "Sorry, I don't know how to answer that. You can try rephrasing your question. Otherwise, I will leave this question for a human to answer.",
             )
-        await unassign_conversation(conversation_id)
+        result = await unassign_conversation(conversation_id)
     elif "CLOSE" in response_message:
         # strip out CLOSE and send the rest of the message
         response_message = response_message.replace("CLOSE", "").strip()
@@ -118,27 +119,45 @@ async def send_response(conversation, response_message):
 
 def clean_html(html):
     soup = BeautifulSoup(html, "html.parser")
-    # wrap any plain text in a <p> tag
-    for text in soup.find_all(string=True):
-        if text.parent.name not in [
-            "p",
-            "h1",
-            "h2",
-            "h3",
-            "h4",
-            "h5",
-            "h6",
-            "blockquote",
-        ]:
-            text.wrap(soup.new_tag("p"))
+    block_elements = ["p", "h1", "h2", "h3", "h4", "h5", "h6", "blockquote"]
+    inline_elements = ["a", "em", "strong", "span"]
+
+    # wrap any standalone plain text in a <p> tag
+    def wrap_text_in_p(tag):
+        for text in tag.find_all(string=True):
+            if (
+                isinstance(text, NavigableString)
+                and text.parent.name not in block_elements + inline_elements
+            ):
+                text.wrap(soup.new_tag("p"))
+
+    wrap_text_in_p(soup)
+
+    # check if the tag has any visible content
+    def has_visible_content(tag):
+        if any(
+            child.string.strip()
+            for child in tag.contents
+            if hasattr(child, "string")
+            and child.string is not None
+            and child.string.strip()
+        ):
+            return True
+        if tag.find_all(["img", "a", "em"]):
+            return True
+        return False
+
     # remove only those tags that have no visible content
     for tag in soup.find_all():
-        if (tag.name not in ["img", "br"]) and (not tag.contents):
+        if (
+            (tag.name not in ["img", "br"])
+            and (not has_visible_content(tag))
+            and (not tag.string)
+        ):
             tag.extract()
-    # trim whitespace from start and end of each tag
-    for tag in soup.find_all():
-        if isinstance(tag.string, str):
+        elif isinstance(tag.string, str):
             tag.string = tag.string.strip()
+
     # convert the soup object back to HTML
     cleaned_html = str(soup)
     return cleaned_html
@@ -173,7 +192,8 @@ async def prep_conversation(item):
                 continue
             # strip EXPERIMENTAL_NOTICE
             msg = part["body"].replace(EXPERIMENTAL_NOTICE, "")
-            # strip EXPERIMENTAL_NOTICE_INNER (intercom sometimes modifies the HTML)
+            # strip DIVIDER and EXPERIMENTAL_NOTICE_INNER (intercom sometimes modifies the HTML)
+            msg = msg.replace(DIVIDER, "")
             msg = msg.replace(EXPERIMENTAL_NOTICE_INNER, "")
             msg = clean_html(msg)
 
@@ -210,4 +230,5 @@ async def validate_intercom_request(request):
 if __name__ == "__main__":
     # generate embeddings on startup
     asyncio.run(make_embeddings())
+    clean_chroma_sections()
     app.run(port=5000)

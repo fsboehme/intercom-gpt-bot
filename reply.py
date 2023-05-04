@@ -26,6 +26,8 @@ async def get_answer(customer_chat):
     # could use gptrim here to save tokens
     # system_prompt = trim(system_prompt)
 
+    # could up this limit if using gpt-4
+    # could also use tiktoken to count tokens instead of characters
     if len(customer_chat) + len(context_sections) > 10000:
         truncate_at = 10000 - len(customer_chat)
         context_sections = context_sections[:truncate_at] + "..."
@@ -36,7 +38,7 @@ async def get_answer(customer_chat):
         + context_sections
         + "\n--\nChat so far:\n"
         + customer_chat
-        + "\n\nReply in HTML:"
+        + "\nRep:\n<Reply in HTML>"
     )
     messages = [{"role": "user", "content": prompt}]
     cprint(prompt, "blue")

@@ -23,5 +23,5 @@ def get_chat_completion(messages, model=OPENAI_MODEL, temperature=OPENAI_TEMPERA
         temperature=temperature,
     )
     messages.append(response.choices[0].message)
-    # cprint("OpenAI response:\n" + response.choices[0].message.content, "yellow")
+    cprint("OpenAI response:\n" + response.choices[0].message.content, "yellow")
     return response.choices[0].message.content

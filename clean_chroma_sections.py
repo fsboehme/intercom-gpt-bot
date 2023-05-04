@@ -1,22 +1,33 @@
+from termcolor import cprint
 from api.chroma import collection
 from make_embeddings import Article, Section, collection, session_scope
 
 
 def clean_chroma_sections():
-    # delete any sections in chroma for articles that no longer exist
+    """
+    deletes any sections in chroma for articles that no longer exist in the db
+    """
     with session_scope() as db_session:
-        existing_articles = db_session.query(Article).all()
-        existing_article_ids = {a.id for a in existing_articles}
-        existing_sections = db_session.query(Section).all()
+        # Get all sections whose article_id does not exist in the Article table
+        subquery = (
+            db_session.query(Article.id)
+            .filter(Article.id == Section.article_id)
+            .exists()
+        )
+        non_existent_sections = db_session.query(Section).filter(~subquery).all()
 
         removed_sections = []
-        for section in existing_sections:
-            if section.article_id not in existing_article_ids:
+        for section in non_existent_sections:
+            if collection.get(section.checksum)["ids"]:
+                cprint(f"Removing section: {section.content[:100]}", "blue")
                 removed_sections.append(section.checksum)
+            else:
+                # delete from db
+                db_session.delete(section)
 
         if removed_sections:
             collection.delete(ids=removed_sections)
-            print(f"Removed sections: {removed_sections}")
+            cprint(f"Removed sections: {len(removed_sections)}", "red")
 
 
 if __name__ == "__main__":

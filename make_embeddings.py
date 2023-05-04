@@ -15,6 +15,7 @@ from sqlalchemy import (
     create_engine,
 )
 from sqlalchemy.orm import declarative_base, sessionmaker
+from termcolor import cprint
 
 from api.chroma import collection
 from api.openai import get_embedding
@@ -91,6 +92,13 @@ def store_articles(articles: List[Dict[str, Any]]):
                 existing_article.url = article["url"]
                 existing_article.updated_at = article["updated_at"]
                 updated_articles.append(article)
+
+        # Delete articles that no longer exist
+        fetched_article_ids = [int(a["id"]) for a in articles]
+        for existing_article in db_session.query(Article).all():
+            if existing_article.id not in fetched_article_ids:
+                cprint(f"Deleting article: {existing_article.title}", "red")
+                db_session.delete(existing_article)
 
     return updated_articles
 
@@ -276,7 +284,7 @@ async def make_embeddings(force_update=False):
     # from sample_data import articles
 
     updated_articles = store_articles(articles)
-    print(f"Updated articles: {len(updated_articles)}")
+    cprint(f"Updated articles: {len(updated_articles)}", "green")
 
     loop_articles = updated_articles
     if force_update:
