@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import hmac
 import os
+import subprocess
 from bs4 import BeautifulSoup, NavigableString
 from quart import Quart, request, jsonify
 from dotenv import load_dotenv
@@ -32,6 +33,7 @@ EXPERIMENTAL_NOTICE_INNER = f"NOTE: {REPLY_ADMIN_NAME} is our experimental AI ch
 DIVIDER = "<p>_____</p>"
 EXPERIMENTAL_NOTICE = f"{DIVIDER}<p><i>{EXPERIMENTAL_NOTICE_INNER}</i></p>"
 TEST_MODE = os.getenv("TEST_MODE", "false").lower() == "true"
+GITHUB_WEBHOOK_SECRET = os.getenv("GITHUB_WEBHOOK_SECRET")
 
 
 app = Quart(__name__)
@@ -227,6 +229,28 @@ async def validate_intercom_request(request):
 
     # Check if the signatures match
     return hmac.compare_digest(signature_header, expected_signature)
+
+
+@app.route("/deploy", methods=["POST"])
+def deploy():
+    signature = request.headers.get("X-Hub-Signature-256")
+    if signature is None:
+        return "Forbidden", 403
+
+    payload = request.get_data()
+    digest = hmac.new(
+        GITHUB_WEBHOOK_SECRET.encode(), payload, hashlib.sha256
+    ).hexdigest()
+    expected_signature = f"sha256={digest}"
+
+    if not hmac.compare_digest(expected_signature, signature):
+        return "Forbidden", 403
+
+    if request.method == "POST":
+        subprocess.Popen(["/home/flask/deploy.sh"])
+        return "OK", 200
+    else:
+        return "Method Not Allowed", 405
 
 
 if __name__ == "__main__":

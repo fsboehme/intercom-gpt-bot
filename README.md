@@ -18,13 +18,13 @@ Generate embeddings from your articles (fetches all your articles from the Inter
 
     python make_embeddings.py
 
-Simply run this again after making changes to articles and it will update any changes.
+Simply run this again after making changes to articles and it will update any changes. (Also runs on each server start.)
 
 ### Run locally
 
 In a terminal window run
 
-    python intercom_webhook.py
+    python main.py
 
 In another terminal window run
 
@@ -37,8 +37,15 @@ Set up your webhook in Intercom developer hub > webhooks.
   - conversation.user.created
   - conversation.user.replied
 
+### Deploy
+
+Chroma, unfortunately, is too big for a free Vercel instance. I'll look into replacing it with something lighter.
+
+In a production environment, you'll need Hypercorn:
+
+    pip install hypercorn
+
 ## To do:
 
-- more testing and prompt optimization
 - add webhook receiver for new/updated articles
-- switch Chroma to using client/server mode
+- replace chroma with something lighter
