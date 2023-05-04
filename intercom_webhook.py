@@ -59,6 +59,8 @@ async def process_webhook(webhook_data):
     # Add your async logic to process the webhook data here
     # e.g., store it in a database, trigger other actions, or make API calls
     print(f"Received webhook: {webhook_data}")
+    if webhook_data == "hello world":
+        return
 
     item = webhook_data["data"]["item"]
     # print(f"Data > Item: {item}")
