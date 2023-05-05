@@ -222,6 +222,9 @@ def deploy():
         return "Forbidden", 403
 
     payload = request.get_data()
+    if not isinstance(payload, bytes):
+        payload = bytes(payload, "utf-8")
+
     key = GITHUB_WEBHOOK_SECRET.encode("utf-8")
     digest = hmac.new(key, payload, hashlib.sha256).hexdigest()
     expected_signature = f"sha256={digest}"
