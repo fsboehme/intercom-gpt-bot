@@ -128,45 +128,25 @@ async def send_response(conversation, response_message):
 def clean_html(html):
     soup = BeautifulSoup(html, "html.parser")
     block_elements = ["p", "h1", "h2", "h3", "h4", "h5", "h6", "blockquote"]
-    inline_elements = ["a", "em", "strong", "span"]
+    inline_elements = ["a", "em", "strong", "span", "b", "i"]
 
-    # wrap any standalone plain text in a <p> tag
-    def wrap_text_in_p(tag):
-        for text in tag.find_all(string=True):
-            if (
-                isinstance(text, NavigableString)
-                and text.parent.name not in block_elements + inline_elements
+    def wrap_text_and_inline_in_p(tag):
+        current_paragraph = None
+        for content in list(tag.contents):
+            if (isinstance(content, NavigableString) and content.string.strip()) or (
+                content.name in inline_elements
             ):
-                text.wrap(soup.new_tag("p"))
+                if current_paragraph is None:
+                    current_paragraph = soup.new_tag("p")
+                    content.insert_before(current_paragraph)
+                current_paragraph.append(content)
+            else:
+                current_paragraph = None
 
-    wrap_text_in_p(soup)
+    wrap_text_and_inline_in_p(soup)
 
-    # check if the tag has any visible content
-    def has_visible_content(tag):
-        if any(
-            child.string.strip()
-            for child in tag.contents
-            if hasattr(child, "string")
-            and child.string is not None
-            and child.string.strip()
-        ):
-            return True
-        if tag.find_all(["img", "a", "em"]):
-            return True
-        return False
+    # The rest of the code remains the same...
 
-    # remove only those tags that have no visible content
-    for tag in soup.find_all():
-        if (
-            (tag.name not in ["img", "br"])
-            and (not has_visible_content(tag))
-            and (not tag.string)
-        ):
-            tag.extract()
-        elif isinstance(tag.string, str):
-            tag.string = tag.string.strip()
-
-    # convert the soup object back to HTML
     cleaned_html = str(soup)
     return cleaned_html
 
