@@ -86,6 +86,26 @@ async def process_webhook(webhook_data):
 
     response_message = await get_answer("\n".join(chat_history))
 
+    # fetch conversation again from api to make sure it hasn't been updated
+    conversation = await get_conversation(item["id"])
+    # check conversation parts to see if a new reply has been added (ignoring bot replies)
+    fetched_non_bot_conversation_parts = [
+        cp
+        for cp in conversation["conversation_parts"]["conversation_parts"]
+        if cp["author"]["type"] != "bot"
+    ]
+    # if webhook item has no conversation parts, any non-bot message will be newer
+    # otherwise, we check if the last message is the same (id) as the last non-bot message
+    webhook_item_conversation_parts = item["conversation_parts"]["conversation_parts"]
+    if fetched_non_bot_conversation_parts and (
+        not webhook_item_conversation_parts
+        or fetched_non_bot_conversation_parts[-1]["id"]
+        != webhook_item_conversation_parts[-1]["id"]
+    ):
+        # there's already a newer reply, don't reply
+        cprint("Conversation already updated", "red")
+        return
+
     result = await send_response(item, response_message)
     return result
 
@@ -100,12 +120,12 @@ async def send_response(conversation, response_message):
             result = await send_reply(
                 conversation_id, response_message + EXPERIMENTAL_NOTICE
             )
-        # if assigned to REPLY_ADMIN_ID
-        elif conversation["admin_assignee_id"] == REPLY_ADMIN_ID:
-            result = await send_reply(
-                conversation_id,
-                "Sorry, I don't know how to answer that. You can try rephrasing your question. Otherwise, I will leave this question for a human to answer.",
-            )
+        # # if assigned to REPLY_ADMIN_ID
+        # elif conversation["admin_assignee_id"] == REPLY_ADMIN_ID:
+        #     result = await send_reply(
+        #         conversation_id,
+        #         "Sorry, I don't know how to answer that. You can try rephrasing your question. Otherwise, I will leave this question for a human to answer.",
+        #     )
         result = await unassign_conversation(conversation_id)
     elif "CLOSE" in response_message:
         # strip out CLOSE and send the rest of the message
@@ -144,8 +164,6 @@ def clean_html(html):
                 current_paragraph = None
 
     wrap_text_and_inline_in_p(soup)
-
-    # The rest of the code remains the same...
 
     cleaned_html = str(soup)
     return cleaned_html
