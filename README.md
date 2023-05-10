@@ -4,11 +4,13 @@ ChatGPT as your Intercom teammate ... and it knows all your help articles.
 
 Intercom API + Open AI API + Chroma.
 
-    Not finished. Work in progress.
+Not surprisingly, GPT-4 does quite a bit better than GPT-3.5, so ideally try and get access to the GPT-4 API.
 
 ## Setup
 
 Copy `.env.sample` to `.env` and enter your API Keys, company name, account_id for the intercom account from which you want to send replies (recommend setting up a new one that looks like a bot so people know what they're dealing with).
+
+I would start with `TEST_MODE=true` so it posts internal notes instead of replying directly to the customer at first. This will allow you to assess its performance and tweak your articles as needed.
 
 Install requirements:
 
@@ -47,5 +49,5 @@ In a production environment, you'll need Hypercorn:
 
 ## To do:
 
-- add webhook receiver for new/updated articles
 - replace chroma with something lighter
+- cancel the open ai api request when customer replies again before gpt reply is posted
