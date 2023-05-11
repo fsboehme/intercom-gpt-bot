@@ -45,8 +45,8 @@ async def hello_world():
     app.add_background_task(process_webhook, "hello world")
     # if update articles secret in GET request is correct, update embeddings
     if request.args.get("update_articles") == UPDATE_ARTICLES_SECRET:
-        await make_embeddings()
-        clean_chroma_sections()
+        # restart server
+        subprocess.Popen(["/home/flask/deploy.sh"])
         return "Articles updated!"
     return "Beep boop! We're live!"
 

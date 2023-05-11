@@ -5,3 +5,4 @@ articles.db
 env/
 __pycache__/
 sample_data.py
+.vercel
