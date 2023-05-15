@@ -1,3 +1,4 @@
+import time
 import openai
 import os
 from dotenv import load_dotenv
@@ -17,11 +18,19 @@ def get_embedding(text, model=OPENAI_EMBEDDINGS_MODEL):
 
 
 def get_chat_completion(messages, model=OPENAI_MODEL, temperature=OPENAI_TEMPERATURE):
-    response = openai.ChatCompletion.create(
-        model=model,
-        messages=messages,
-        temperature=temperature,
-    )
+    while True:
+        try:
+            response = openai.ChatCompletion.create(
+                model=model,
+                messages=messages,
+                temperature=temperature,
+            )
+        except openai.error.RateLimitError:
+            cprint("Rate limit error, trying again", "red")
+            # wait 5 seconds and try again
+            time.sleep(5)
+            continue
+        break
     messages.append(response.choices[0].message)
     cprint("OpenAI response:\n" + response.choices[0].message.content, "yellow")
     return response.choices[0].message.content
