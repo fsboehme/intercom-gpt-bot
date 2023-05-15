@@ -120,12 +120,6 @@ async def send_response(conversation, response_message):
             result = await send_reply(
                 conversation_id, response_message + EXPERIMENTAL_NOTICE
             )
-        # # if assigned to REPLY_ADMIN_ID
-        # elif conversation["admin_assignee_id"] == REPLY_ADMIN_ID:
-        #     result = await send_reply(
-        #         conversation_id,
-        #         "Sorry, I don't know how to answer that. You can try rephrasing your question. Otherwise, I will leave this question for a human to answer.",
-        #     )
         result = await unassign_conversation(conversation_id)
     elif "CLOSE" in response_message:
         # strip out CLOSE and send the rest of the message
@@ -135,8 +129,10 @@ async def send_response(conversation, response_message):
             result = await send_reply(
                 conversation_id, response_message + EXPERIMENTAL_NOTICE
             )
-        result = await send_reply(conversation_id, "CLOSE CONVERSATION", "note")
-        # await close_conversation(conversation_id)
+        if TEST_MODE:
+            result = await send_reply(conversation_id, "CLOSE CONVERSATION", "note")
+        else:
+            result = await close_conversation(conversation_id)
     else:
         response_message = clean_html(response_message)
         result = await send_reply(
