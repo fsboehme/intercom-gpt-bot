@@ -144,7 +144,7 @@ async def send_response(conversation, response_message):
 def clean_html(html):
     soup = BeautifulSoup(html, "html.parser")
     block_elements = ["p", "h1", "h2", "h3", "h4", "h5", "h6", "blockquote"]
-    inline_elements = ["a", "em", "strong", "span", "b", "i"]
+    inline_elements = ["a", "em", "strong", "span", "b", "i", "code"]
 
     def wrap_text_and_inline_in_p(tag):
         current_paragraph = None
