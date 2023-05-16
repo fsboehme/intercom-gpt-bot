@@ -42,7 +42,6 @@ app = Quart(__name__)
 
 @app.route("/")
 async def hello_world():
-    app.add_background_task(process_webhook, "hello world")
     # if update articles secret in GET request is correct, update embeddings
     if request.args.get("update_articles") == UPDATE_ARTICLES_SECRET:
         # restart server
@@ -65,8 +64,6 @@ async def intercom_webhook():
 
 async def process_webhook(webhook_data):
     print(f"Received webhook: {webhook_data}")
-    if webhook_data == "hello world":
-        return
 
     item = webhook_data["data"]["item"]
     # print(f"Data > Item: {item}")
