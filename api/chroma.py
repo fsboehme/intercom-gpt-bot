@@ -12,11 +12,13 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
 # Construct the absolute path of the .chroma directory
-chroma_dir = os.path.join(script_dir, "..", ".chroma")
+persist_directory = os.path.join(script_dir, "..", ".chroma")
 
-client = chromadb.Client(
-    Settings(chroma_db_impl="duckdb+parquet", persist_directory=chroma_dir)
+client_settings = Settings(
+    chroma_db_impl="duckdb+parquet", persist_directory=persist_directory
 )
+
+client = chromadb.Client(client_settings)
 openai_ef = embedding_functions.OpenAIEmbeddingFunction(
     api_key=os.getenv("OPENAI_API_KEY"), model_name="text-embedding-ada-002"
 )

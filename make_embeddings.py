@@ -60,7 +60,7 @@ def session_scope():
         session.close()
 
 
-def store_articles(articles: List[Dict[str, Any]]):
+def store_articles(articles: List[Dict[str, Any]], force_update_ids: List[int] = []):
     updated_articles = []
 
     with session_scope() as db_session:
@@ -85,7 +85,10 @@ def store_articles(articles: List[Dict[str, Any]]):
                 db_session.add(new_article)
                 updated_articles.append(article)
 
-            elif existing_article.updated_at < article["updated_at"]:
+            elif (
+                existing_article.updated_at < article["updated_at"]
+                or int(article["id"]) in force_update_ids
+            ):
                 existing_article.title = article["title"]
                 existing_article.description = article["description"]
                 existing_article.body = article["body"]
@@ -204,7 +207,7 @@ def generate_checksum(section):
 def store_sections(sections: List[str], article: dict):
     sections = annotate_sections(clean_sections(sections), article)
     article_id = article["id"]
-    # Use the context manager to handle the session
+    url = article["url"]
     with session_scope() as db_session:
         # Get existing sections for the article
         existing_sections = (
@@ -215,6 +218,7 @@ def store_sections(sections: List[str], article: dict):
         matched_existing_sections = []
         removed_sections = []
         embeddings = []
+        documents = []
         metadatas = []
         ids = []
 
@@ -223,7 +227,7 @@ def store_sections(sections: List[str], article: dict):
             # Generate the checksum for the section
             checksum = generate_checksum(section)
 
-            # If a section with the same checksum already exists, skip it and mark for removal
+            # If a section with the same checksum already exists, skip it
             if any([checksum == s.checksum for s in existing_sections]):
                 matched_existing_sections.append(checksum)
                 # make sure it also exists in chroma
@@ -238,7 +242,8 @@ def store_sections(sections: List[str], article: dict):
                     ) or get_embedding(section)
                     collection.add(
                         embeddings=[embedding],
-                        metadatas=[{"article_id": article_id}],
+                        documents=[section],
+                        metadatas=[{"article_id": article_id, "source": url}],
                         ids=[checksum],
                     )
                 continue
@@ -256,10 +261,12 @@ def store_sections(sections: List[str], article: dict):
 
             # Add to lists for chroma
             embeddings.append(embedding)
-            metadatas.append({"article_id": article_id})
+            documents.append(section)
+            # todo: Add source url to metadata
+            metadatas.append({"article_id": article_id, "source": url})
             ids.append(checksum)
 
-        # Delete sections that no longer exist
+        # Delete sections for this article that no longer exist (have changed)
         for existing_section in existing_sections:
             if existing_section.checksum not in matched_existing_sections:
                 # add for removal from chroma if it exists there
@@ -274,20 +281,22 @@ def store_sections(sections: List[str], article: dict):
 
     # Add the new sections to chroma
     if ids:
-        collection.add(embeddings=embeddings, metadatas=metadatas, ids=ids)
+        collection.add(
+            embeddings=embeddings, documents=documents, metadatas=metadatas, ids=ids
+        )
 
 
-async def make_embeddings(force_update=False):
+async def make_embeddings(force_update_all=False, force_update_ids=[]):
     from api.intercom import get_all_articles
 
     articles = await get_all_articles()
     # from sample_data import articles
 
-    updated_articles = store_articles(articles)
+    updated_articles = store_articles(articles, force_update_ids=force_update_ids)
     cprint(f"Updated articles: {len(updated_articles)}", "green")
 
     loop_articles = updated_articles
-    if force_update:
+    if force_update_all:
         loop_articles = [
             article
             for article in articles

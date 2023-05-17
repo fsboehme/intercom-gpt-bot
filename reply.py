@@ -78,6 +78,7 @@ if __name__ == "__main__":
     parser.add_argument("question", help="The customer question to be answered.")
     try:
         args = parser.parse_args()
-        get_answer(args.question)
+        asyncio.run(get_answer("User: " + args.question))
     except SystemExit:
-        get_answer("how can i enter scores?")
+        # asyncio.run(get_answer("User: how do i enter scores?"))
+        asyncio.run(get_answer("User: how do i make a schedule for 9 teams?"))
