@@ -28,6 +28,8 @@ def clean_chroma_sections():
         if removed_sections:
             collection.delete(ids=removed_sections)
             cprint(f"Removed sections: {len(removed_sections)}", "red")
+        else:
+            cprint(f"No sections to remove", "green")
 
 
 if __name__ == "__main__":

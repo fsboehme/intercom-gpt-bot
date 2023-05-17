@@ -13,7 +13,7 @@ from api.intercom import (
     send_reply,
     unassign_conversation,
 )
-from management.clean_chroma_sections import clean_chroma_sections
+from clean_chroma_sections import clean_chroma_sections
 from make_embeddings import make_embeddings
 
 from reply import get_answer

@@ -22,7 +22,13 @@ Generate embeddings from your articles (fetches all your articles from the Inter
 
 Simply run this again after making changes to articles and it will update any changes. (Also runs on each server start.)
 
-### Run locally
+### Quick Testing
+
+You can quickly test how it replies to a given question by just passing it to `reply.py`
+
+    python reply.py "how much does it cost?"
+
+### Run the bot locally
 
 In a terminal window run
 

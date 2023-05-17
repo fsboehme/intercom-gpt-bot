@@ -2,7 +2,13 @@ import asyncio
 import json
 from termcolor import cprint
 from api.chroma import collection
-from make_embeddings import Article, Section, collection, make_embeddings, session_scope
+from make_embeddings import (
+    Article,
+    Section,
+    collection,
+    make_embeddings,
+    session_scope,
+)
 
 
 def add_section_content_to_chroma():
