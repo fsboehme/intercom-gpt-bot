@@ -16,6 +16,8 @@ load_dotenv()
 async def get_answer(customer_chat):
     # summarize the customer chat into one question for better search
     question = await summarize_question(customer_chat)
+    if "UNCLEAR" in question:
+        question = customer_chat
     cprint(question, "magenta")
 
     # take the question and search the most relevant embeddings
@@ -34,16 +36,13 @@ async def get_answer(customer_chat):
         truncate_at = max_chat_length - len(customer_chat)
         context_sections = context_sections[:truncate_at] + "..."
 
-    prompt = (
-        system_prompt
-        + "\nHelp article sections:\n"
-        + context_sections
-        + "\n--\nChat so far:\n"
-        + customer_chat
-        + "\nRep:\n<Reply in HTML>"
-    )
-    messages = [{"role": "user", "content": prompt}]
-    cprint(prompt, "blue")
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "system", "content": "Help article sections:\n" + context_sections},
+    ]
+    prompt = "Chat so far:\n" + customer_chat + "\nRep:\n<Reply in HTML>"
+    messages += [{"role": "user", "content": prompt}]
+    cprint(messages, "blue")
 
     # generate the reply
     loop = asyncio.get_event_loop()
@@ -66,7 +65,7 @@ def get_context_sections(customer_chat):
 async def summarize_question(customer_chat):
     # send chat to openai to summarize
     loop = asyncio.get_event_loop()
-    system_prompt = """You are part of a customer service team. Distill the given customer service chat to just the question being currently asked, so that your colleagues have an easier time answering it."""
+    system_prompt = """You are part of a customer service team. Distill the given customer service chat to just the question being currently asked, so that your colleagues have an easier time answering it. If you can't determine the question that is being asked, just say 'UNCLEAR'."""
     messages = [{"role": "system", "content": system_prompt}]
     messages.append({"role": "user", "content": customer_chat})
     question = await loop.run_in_executor(None, get_chat_completion, messages)
