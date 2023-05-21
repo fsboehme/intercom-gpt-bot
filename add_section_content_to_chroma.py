@@ -48,7 +48,7 @@ def add_section_content_to_chroma():
                 )
         print(f"Articles out of sync: {force_update_article_ids}")
         if force_update_article_ids:
-            asyncio.run(make_embeddings(force_update_article_ids))
+            asyncio.run(make_embeddings(force_update_ids=force_update_article_ids))
 
 
 if __name__ == "__main__":
