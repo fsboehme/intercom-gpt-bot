@@ -25,8 +25,8 @@ def get_chat_completion(messages, model=OPENAI_MODEL, temperature=OPENAI_TEMPERA
                 messages=messages,
                 temperature=temperature,
             )
-        except openai.error.RateLimitError:
-            cprint("Rate limit error, trying again", "red")
+        except (openai.error.RateLimitError, openai.error.APIError) as e:
+            cprint("{e}", "red")
             # wait 5 seconds and try again
             time.sleep(5)
             continue
