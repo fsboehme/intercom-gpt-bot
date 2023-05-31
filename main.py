@@ -248,8 +248,9 @@ async def deploy():
         return "Method Not Allowed", 405
 
 
+# update embeddings on startup
+asyncio.run(make_embeddings())
+clean_chroma_sections()
+
 if __name__ == "__main__":
-    # generate embeddings on startup
-    asyncio.run(make_embeddings())
-    clean_chroma_sections()
     app.run(port=5000)
