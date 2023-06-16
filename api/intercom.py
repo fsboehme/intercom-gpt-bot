@@ -8,6 +8,7 @@ load_dotenv()
 
 INTERCOM_ACCESS_TOKEN = os.getenv("INTERCOM_ACCESS_TOKEN")
 REPLY_ADMIN_ID = os.getenv("REPLY_ADMIN_ID")
+HUMAN_ASSIGNEE_ID = os.getenv("HUMAN_ASSIGNEE_ID", None)
 TEST_MODE = os.getenv("TEST_MODE", False)
 
 
@@ -78,6 +79,27 @@ async def assign_conversation(conversation_id, assignee_id=REPLY_ADMIN_ID):
         "assignee_id": assignee_id,
     }
     return await manage_conversation(conversation_id, payload)
+
+
+async def assign_conversation_to_human(conversation_id, assignee_id=HUMAN_ASSIGNEE_ID):
+    # first unassign the conversation
+    await unassign_conversation(conversation_id)
+    # then assign it to the human
+    payload = {
+        "message_type": "assignment",
+        "admin_id": REPLY_ADMIN_ID,
+        "assignee_id": assignee_id,
+    }
+    conversation = await manage_conversation(conversation_id, payload)
+    return (
+        "conversation assigned to human"
+        if int(assignee_id)
+        in [
+            conversation["team_assignee_id"],
+            conversation["admin_assignee_id"],
+        ]
+        else "error assigning conversation to human"
+    )
 
 
 async def close_conversation(conversation_id):

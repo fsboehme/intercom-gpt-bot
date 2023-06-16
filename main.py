@@ -8,12 +8,14 @@ from quart import Quart, request, jsonify
 from dotenv import load_dotenv
 from termcolor import cprint
 from api.intercom import (
+    assign_conversation,
     close_conversation,
     get_conversation,
     send_reply,
     unassign_conversation,
 )
 from clean_chroma_sections import clean_chroma_sections
+from functions import execute_function_call
 from make_embeddings import make_embeddings
 
 from reply import get_answer
@@ -23,6 +25,7 @@ load_dotenv()
 
 REPLY_ADMIN_ID = int(os.getenv("REPLY_ADMIN_ID"))
 REPLY_ADMIN_NAME = os.getenv("REPLY_ADMIN_NAME")
+HUMAN_ASSIGNEE_ID = os.getenv("HUMAN_ASSIGNEE_ID", None)
 AUTHOR_LABELS = {
     "user": "User",
     "lead": "User",
@@ -70,7 +73,9 @@ async def process_webhook(webhook_data):
     if not item["type"] == "conversation":
         return
     # only reply to conversations that are unassigned or assigned to the bot
-    if item["admin_assignee_id"] and item["admin_assignee_id"] != REPLY_ADMIN_ID:
+    if (
+        item["admin_assignee_id"] and item["admin_assignee_id"] != REPLY_ADMIN_ID
+    ) or item["team_assignee_id"]:
         if TEST_MODE:
             # in test mode, we want to process all conversations
             cprint(
@@ -79,10 +84,37 @@ async def process_webhook(webhook_data):
         else:
             return
 
-    chat_history = await prep_conversation(item)
+    messages = await prep_conversation(item)
 
-    response_message = await get_answer("\n".join(chat_history))
+    response_message, messages = await get_answer(messages)
 
+    if await conversation_updated(item):
+        return
+
+    if response_message.get("function_call"):
+        if response_message["content"]:
+            # if there's a function call and content, send the content first
+            await send_response(item, response_message["content"])
+        # execute function call
+        results = await execute_function_call(response_message, item["id"])
+        messages.append(
+            {
+                "role": "function",
+                "name": response_message["function_call"]["name"],
+                "content": results,
+            }
+        )
+        # get answer again with function results
+        response_message, messages = await get_answer(messages, skip_prep=True)
+
+    result = await send_response(item, response_message["content"])
+    return result
+
+
+async def conversation_updated(item):
+    """
+    Check if conversation has been updated since webhook was sent
+    """
     # fetch conversation again from api to make sure it hasn't been updated
     conversation = await get_conversation(item["id"])
     # check conversation parts to see if a new reply has been added (ignoring bot replies)
@@ -101,23 +133,14 @@ async def process_webhook(webhook_data):
     ):
         # there's already a newer reply, don't reply
         cprint("Conversation already updated", "red")
-        return
-
-    result = await send_response(item, response_message)
-    return result
+        return True
+    return False
 
 
 async def send_response(conversation, response_message):
     conversation_id = conversation["id"]
-    if "PASS" in response_message:
-        # strip out PASS and send the rest of the message
-        response_message = response_message.replace("PASS", "").strip()
-        response_message = clean_html(response_message)
-        if response_message:
-            result = await send_reply(
-                conversation_id, response_message + EXPERIMENTAL_NOTICE
-            )
-        result = await unassign_conversation(conversation_id)
+    if "SKIP" in response_message:
+        result = None
     elif "CLOSE" in response_message:
         # strip out CLOSE and send the rest of the message
         response_message = response_message.replace("CLOSE", "").strip()
@@ -132,6 +155,9 @@ async def send_response(conversation, response_message):
             result = await close_conversation(conversation_id)
     else:
         response_message = clean_html(response_message)
+        if not response_message:
+            # if message is empty, don't send it
+            return
         result = await send_reply(
             conversation_id, response_message + EXPERIMENTAL_NOTICE
         )
@@ -162,14 +188,24 @@ def clean_html(html):
     return cleaned_html
 
 
+def get_author_role(author):
+    if author["type"] == "admin" and author["id"] == REPLY_ADMIN_ID:
+        return "assistant"
+    return "user"
+
+
+def get_author_label(author):
+    if str(author["id"]) == str(REPLY_ADMIN_ID):
+        return ""
+    author_label = AUTHOR_LABELS.get(author["type"])
+    return f"{author_label}: "
+
+
 async def prep_conversation(item):
-    user_name = AUTHOR_LABELS.get(item["source"]["author"]["type"])
-    # skip first message if automated
-    if item["source"]["delivered_as"] == "automated":
-        messages = []
-    else:
-        msg = item["source"]["body"]
-        messages = [f"{user_name}: {msg}"]
+    author_role = get_author_role(item["source"]["author"])
+    author_label = get_author_label(item["source"]["author"])
+    body = item["source"]["body"]
+    messages = [{"role": author_role, "content": f"{author_label}{body}"}]
 
     if item["conversation_parts"]["total_count"] > 0:
         # make API request to fetch full conversation
@@ -179,25 +215,27 @@ async def prep_conversation(item):
         # include only parts with body
         convo_parts = [part for part in convo_parts if part["body"]]
 
-        if len(convo_parts) > 8:
+        max_convo_parts = 10
+        if len(convo_parts) > max_convo_parts:
             messages.append("...[messages truncated]...")
 
-        for part in convo_parts[-8:]:
-            # skip bot messages
+        for part in convo_parts[-max_convo_parts:]:
+            # skip bot messages (intercom bots)
             if part["author"]["type"] == "bot":
                 continue
             # skip if note and from REPLY_ADMIN_ID
             if part["part_type"] == "note" and part["author"]["id"] == REPLY_ADMIN_ID:
                 continue
             # strip EXPERIMENTAL_NOTICE
-            msg = part["body"].replace(EXPERIMENTAL_NOTICE, "")
+            body = part["body"].replace(EXPERIMENTAL_NOTICE, "")
             # strip DIVIDER and EXPERIMENTAL_NOTICE_INNER (intercom sometimes modifies the HTML)
-            msg = msg.replace(DIVIDER, "")
-            msg = msg.replace(EXPERIMENTAL_NOTICE_INNER, "")
-            msg = clean_html(msg)
+            body = body.replace(DIVIDER, "")
+            body = body.replace(EXPERIMENTAL_NOTICE_INNER, "")
+            body = clean_html(body)
 
-            author_label = AUTHOR_LABELS.get(part["author"]["type"])
-            messages.append(f"{author_label}: {msg}")
+            author_role = get_author_role(part["author"])
+            author_label = get_author_label(part["author"])
+            messages.append({"role": author_role, "content": f"{author_label}{body}"})
 
     return messages
 
