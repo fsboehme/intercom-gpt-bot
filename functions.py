@@ -4,7 +4,7 @@ from api.intercom import assign_conversation_to_human
 functions = [
     {
         "name": "assign_conversation_to_human",
-        "description": "Assigns the conversation to a human representative.",
+        "description": "Passes conversation to the team, i.e. assigns the conversation to a human representative",
         "parameters": {
             "type": "object",
             "properties": {
