@@ -7,13 +7,7 @@ from bs4 import BeautifulSoup, NavigableString
 from quart import Quart, request, jsonify
 from dotenv import load_dotenv
 from termcolor import cprint
-from api.intercom import (
-    assign_conversation,
-    close_conversation,
-    get_conversation,
-    send_reply,
-    unassign_conversation,
-)
+from api.intercom import close_conversation, get_conversation, send_reply
 from clean_chroma_sections import clean_chroma_sections
 from functions import execute_function_call
 from make_embeddings import make_embeddings
