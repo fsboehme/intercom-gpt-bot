@@ -211,7 +211,10 @@ async def prep_conversation(item):
 
         max_convo_parts = 10
         if len(convo_parts) > max_convo_parts:
-            messages.append("...[messages truncated]...")
+            omitted = len(convo_parts) - max_convo_parts
+            messages.append(
+                {"role": "system", "content": f"{omitted} messages omitted"}
+            )
 
         for part in convo_parts[-max_convo_parts:]:
             # skip bot messages (intercom bots)
